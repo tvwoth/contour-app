@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расчёт контура</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        /* Стили для H-параметров */
+        .h-params-container {
+            max-height: 700px;
+            position: relative;
+            overflow: hidden;
+        }
+        .h-params-img-container {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: white;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+        }
+        .h-params-img {
+            max-width: 300px;
+            height: auto;
+        }
+        .h-params-fields {
+            max-height: 400px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .h-params-fields .form-control {
+            font-size: 0.85rem;
+            padding: 4px 8px;
+            height: 32px;
+            width: 100%;
+            max-width: 150px;
+        }
+        .h-params-container, .h-params-fields {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        /* Стили для уведомлений */
+        .alert-fixed {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            min-width: 250px;
+            max-width: 80%;
+            font-size: 0.9rem;
+            padding: 0.5rem 2rem 0.5rem 1rem;
+        }
+        .alert-fixed .btn-close {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 0.5rem;
+            font-size: 0.8rem;
+        }
+        /* Стили для конфигурации и кнопок */
+        .config-section .form-select {
+            flex-grow: 1;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .config-section .btn-icon {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.9rem;
+            line-height: 1;
+            box-sizing: border-box;
+        }
+        /* Добавленный стиль для выравнивания кнопок */
+        .settings-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        @media (max-width: 576px) {
+            .h-params-container {
+                max-height: 600px;
+            }
+            .h-params-fields {
+                max-height: 340px;
+            }
+            .h-params-img {
+                max-width: 100%;
+            }
+            .h-params-fields .form-control {
+                max-width: 100%;
+            }
+            .alert-fixed {
+                min-width: 200px;
+                max-width: 90%;
+                font-size: 0.8rem;
+                padding: 0.4rem 1.5rem 0.4rem 0.8rem;
+            }
+            .alert-fixed .btn-close {
+                right: 0.5rem;
+                font-size: 0.7rem;
+            }
+            .config-section .d-flex {
+                flex-wrap: nowrap;
+                align-items: center;
+            }
+            .config-section .form-select {
+                font-size: 0.9rem;
+                padding: 0.25rem 0.5rem;
+                height: 32px;
+                line-height: 1.5;
+                width: 100%;
+                flex-grow: 1;
+                margin-right: 0.5rem;
+                box-sizing: border-box;
+            }
+            .config-section .btn-icon {
+                padding: 0;
+                font-size: 0.9rem;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-sizing: border-box;
+            }
+            .table th, .table td {
+                font-size: 0.8rem;
+            }
+            .form-control, .btn {
+                font-size: 0.9rem;
+            }
+            .plot-section img {
+                max-height: 250px;
+            }
+            .params-columns p {
+                margin-bottom: 0.5rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Расчёт контура</h1>
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show alert-fixed" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <!-- Configuration and H-Parameters -->
+        <div class="config-section">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Выберите конфигурацию</h5>
+                    <div class="d-flex align-items-center mb-3">
+                        <form method="POST" id="configForm" class="flex-grow-1">
+                            <select class="form-select" id="config" name="config" onchange="this.form.action.value='load_config'; this.form.submit();">
+                                {% for option in config_options %}
+                                    <option value="{{ option }}" {{ 'selected' if option == selected_config else '' }} data-image="{{ config_images[option] if config_images and option in config_images else '' }}">{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="hidden" name="action" value="load_config">
+                        </form>
+                        <button type="button" class="btn btn-outline-info btn-icon ms-2" data-bs-toggle="modal" data-bs-target="#configHelpModal" title="Справка"><i class="bi bi-question-circle"></i></button>
+                    </div>
+                    <div class="settings-header">
+                        <button type="button" class="btn btn-outline-secondary mb-3" data-bs-toggle="collapse" data-bs-target="#hParams">Свои настройки</button>
+                        <button type="button" class="btn btn-outline-info mb-3 ms-2" data-bs-toggle="modal" data-bs-target="#helpModal"><i class="bi bi-question-circle me-1"></i>Инструкция</button>
+                    </div>
+                    <div class="collapse h-params-container" id="hParams">
+                        <div class="h-params-img-container">
+                            <img src="{{ url_for('static', filename='h_params_guide.png') }}" class="h-params-img img-fluid" alt="Инструкция по H-параметрам">
+                        </div>
+                        <div class="h-params-fields">
+                            <form method="POST" id="hParamsForm">
+                                <input type="hidden" name="action" value="calculate">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="j_x" class="form-label">H1 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="j_x" name="j_x" placeholder="Введите H1" value="{{ abs_j_x | float | round(2) if abs_j_x is not none else '' }}">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="c_x" class="form-label">H2 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="c_x" name="c_x" placeholder="Введите H2" value="{{ abs_c_x | float | round(2) if abs_c_x is not none else '' }}">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="cd_len" class="form-label">H3 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="cd_len" name="cd_len" placeholder="Введите H3" value="{{ calculator.CD_LEN | float | round(2) if calculator.CD_LEN is not none else '' }}">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="de_len" class="form-label">H4 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="de_len" name="de_len" placeholder="Введите H4" value="{{ calculator.DE_LEN | float | round(2) if calculator.DE_LEN is not none else '' }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <label for="fg_len" class="form-label">H5 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="fg_len" name="fg_len" placeholder="Введите H5" value="{{ calculator.FG_LEN | float | round(2) if calculator.FG_LEN is not none else '' }}">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="gh_len" class="form-label">H6 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="gh_len" name="gh_len" placeholder="Введите H6" value="{{ calculator.GH_LEN | float | round(2) if calculator.GH_LEN is not none else '' }}">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="hi_len" class="form-label">H7 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="hi_len" name="hi_len" placeholder="Введите H7" value="{{ calculator.HI_LEN | float | round(2) if calculator.HI_LEN is not none else '' }}">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="jk_len" class="form-label">H8 (мм)</label>
+                                            <input type="number" step="any" class="form-control" id="jk_len" name="jk_len" placeholder="Введите H8" value="{{ calculator.JK_LEN | float | round(2) if calculator.JK_LEN is not none else '' }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="hcor" class="form-label">Hcor (мм)</label>
+                                    <input type="number" step="any" class="form-control" id="hcor" name="hcor" placeholder="Введите Hcor" value="{{ calculator.HCOR | float | round(2) if calculator.HCOR is not none else '' }}">
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Main Parameters -->
+        <div class="form-section">
+            <form method="POST" id="calcForm" onsubmit="showSpinner()">
+                <input type="hidden" name="action" value="calculate">
+                <input type="hidden" id="configHidden" name="config" value="{{ selected_config }}">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Основные параметры</h5>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label for="n1" class="form-label">n1</label>
+                                <input type="number" step="any" class="form-control" id="n1" name="n1" placeholder="Введите n1" value="{{ calculator.n1 | float | round(2) if calculator.n1 is not none else '' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="n2" class="form-label">n2</label>
+                                <input type="number" step="any" class="form-control" id="n2" name="n2" placeholder="Введите n2" value="{{ calculator.n2 | float | round(2) if calculator.n2 is not none else '' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="n3" class="form-label">n3</label>
+                                <input type="number" step="any" class="form-control" id="n3" name="n3" placeholder="Введите n3" value="{{ calculator.get_n3() | float | round(2) if calculator.get_n3() is not none else '' }}">
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-md-6">
+                                <label for="angle_EF" class="form-label">Угол (0°–10°)</label>
+                                <input type="number" step="any" min="0" max="10" class="form-control" id="angle_EF" name="angle_EF" placeholder="0–10" value="{{ (calculator.angle_D - 180) | float | round(2) if calculator.angle_D is not none else '' }}">
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="rev" name="rev" {{ 'checked' if calculator.REV else '' }}>
+                                    <label class="form-check-label" for="rev">REV</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Buttons -->
+                <div class="btn-group d-flex justify-content-start" role="group">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-calculator me-1"></i>Рассчитать</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('calcForm').action.value='reset_config'; document.getElementById('calcForm').submit();"><i class="bi bi-arrow-repeat me-1"></i>Сброс</button>
+                </div>
+            </form>
+        </div>
+        <!-- Results -->
+        <div class="result-section">
+            <h5>Результаты</h5>
+            {% if results %}
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Параметры</h6>
+                        <div class="row g-2 params-columns">
+                            <div class="col-6">
+                                <p>n1: {{ results.n1 | float | round(2) if results.n1 is not none else '–' }}</p>
+                                <p>n2: {{ results.n2 | float | round(2) if results.n2 is not none else '–' }}</p>
+                                <p>n3: {{ results.n3 | float | round(2) if results.n3 is not none else '–' }}</p>
+                                <p>Угол: {{ results.angle | float | round(2) if results.angle is not none else '–' }}°</p>
+                                <p>REV: {{ 'Вкл' if results.rev else 'Выкл' }}</p>
+                                <p>H1: {{ results.h1 | float | round(2) if results.h1 is not none else '–' }}</p>
+                                <p>H2: {{ results.h2 | float | round(2) if results.h2 is not none else '–' }}</p>
+                            </div>
+                            <div class="col-6">
+                                <p>H3: {{ results.h3 | float | round(2) if results.h3 is not none else '–' }}</p>
+                                <p>H4: {{ results.h4 | float | round(2) if results.h4 is not none else '–' }}</p>
+                                <p>H5: {{ results.h5 | float | round(2) if results.h5 is not none else '–' }}</p>
+                                <p>H6: {{ results.h6 | float | round(2) if results.h6 is not none else '–' }}</p>
+                                <p>H7: {{ results.h7 | float | round(2) if results.h7 is not none else '–' }}</p>
+                                <p>H8: {{ results.h8 | float | round(2) if results.h8 is not none else '–' }}</p>
+                                <p>Hcor: {{ results.hcor | float | round(2) if results.hcor is not none else '–' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% if plot_url %}
+                    <div class="card shadow-sm plot-section">
+                        <div class="card-body">
+                            <h6 class="card-title">Эскиз контура</h6>
+                            <img src="{{ plot_url }}" alt="Эскиз контура" class="img-fluid">
+                            <a href="{{ plot_url }}" download="contour_plot.png" class="btn btn-outline-secondary btn-sm mt-2"><i class="bi bi-download me-1"></i>Скачать график</a>
+                        </div>
+                    </div>
+                {% endif %}
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Координаты точек</h6>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Точка</th>
+                                    <th>X</th>
+                                    <th>Y</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] %}
+                                {% for label, point in zip(labels, results.points) %}
+                                    <tr>
+                                        <td>{{ label }}</td>
+                                        <td>{{ point[0] | float | round(2) }}</td>
+                                        <td>{{ point[1] | float | round(2) }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% if image_path %}
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-body">
+                            <h6 class="card-title">Схема конфигурации</h6>
+                            <img src="{{ url_for('static', filename=image_path) }}" alt="Схема" class="img-fluid" style="max-width: 300px;">
+                        </div>
+                    </div>
+                {% endif %}
+            {% else %}
+                <p class="text-muted">Введите параметры и нажмите "Рассчитать"</p>
+            {% endif %}
+        </div>
+        <!-- General Help Modal -->
+        <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="helpModalLabel">Инструкция</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <ul>
+                            <li>Выберите конфигурацию из списка или используйте "Пользовательская конфигурация" для ручного ввода.</li>
+                            <li>Введите три из четырёх параметров: n1, n2, n3, угол (0°–10°). Например, n1=100, n2=100, n3=100.</li>
+                            <li>Включите REV с помощью ползунка, чтобы изменить направления линий CD и DE.</li>
+                            <li>Для точной настройки нажмите "Свои настройки" и введите H1–H8, Hcor.</li>
+                            <li>Hcor корректирует n3: прибавляется при вводе, вычитается при выводе.</li>
+                            <li>Нажмите "Рассчитать" для получения результатов, графика и координат точек.</li>
+                            <li>Используйте "Сброс" для возврата к умолчанию.</li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x me-1"></i>Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Config Help Modal -->
+        <div class="modal fade" id="configHelpModal" tabindex="-1" aria-labelledby="configHelpModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="configHelpModalLabel">Справка по конфигурации</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Конфигурация: <span id="configName">{{ selected_config }}</span></p>
+                        <img id="configImage" src="{{ config_images[selected_config] if config_images and selected_config in config_images else '' }}" class="img-fluid" alt="Справка по конфигурации">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x me-1"></i>Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Spinner Overlay -->
+        <div class="spinner-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999; justify-content: center; align-items: center;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showSpinner() {
+            document.querySelector('.spinner-overlay').style.display = 'flex';
+        }
+
+        // Обработчик для изменения конфигурации
+        const configSelect = document.getElementById('config');
+        configSelect.addEventListener('change', function() {
+            showSpinner();
+            const modalTitle = document.getElementById('configHelpModalLabel');
+            const modalImage = document.getElementById('configImage');
+            const configName = document.getElementById('configName');
+            const selectedOption = this.options[this.selectedIndex];
+            modalTitle.textContent = `Справка по конфигурации: ${selectedOption.text}`;
+            modalImage.src = selectedOption.dataset.image || '';
+            configName.textContent = selectedOption.text;
+            // Обновляем скрытое поле config в calcForm
+            const configHidden = document.getElementById('configHidden');
+            if (configHidden) {
+                configHidden.value = this.value;
+            }
+        });
+
+        // Обработчик для изменения полей H в hParamsForm
+        const hParamsForm = document.getElementById('hParamsForm');
+        Array.from(hParamsForm.elements).forEach(element => {
+            if (element.name && element.type !== 'submit' && element.type !== 'hidden') {
+                element.addEventListener('input', function() {
+                    // Переключаем select на Пользовательская конфигурация
+                    configSelect.value = 'Пользовательская конфигурация';
+                    // Обновляем скрытое поле config в calcForm
+                    const configHidden = document.getElementById('configHidden');
+                    if (configHidden) {
+                        configHidden.value = 'Пользовательская конфигурация';
+                    }
+                    // Обновляем модальное окно и configName
+                    const modalTitle = document.getElementById('configHelpModalLabel');
+                    const modalImage = document.getElementById('configImage');
+                    const configName = document.getElementById('configName');
+                    modalTitle.textContent = 'Справка по конфигурации: Пользовательская конфигурация';
+                    modalImage.src = '';
+                    configName.textContent = 'Пользовательская конфигурация';
+                });
+            }
+        });
+
+        // Обработчик отправки calcForm
+        document.getElementById('calcForm').addEventListener('submit', function() {
+            const hParamsForm = document.getElementById('hParamsForm');
+            const calcForm = this;
+            Array.from(hParamsForm.elements).forEach(element => {
+                if (element.name && element.value && element.type !== 'hidden') {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = element.name;
+                    input.value = element.value;
+                    calcForm.appendChild(input);
+                }
+            });
+        });
+
+        // Инициализация configHidden при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            const configHidden = document.getElementById('configHidden');
+            if (configHidden) {
+                configHidden.value = configSelect.value;
+            }
+        });
+    </script>
+</body>
+</html>
