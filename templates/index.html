@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Расчёт контура</title>
+    <title>GlassOverhang</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -148,7 +148,7 @@
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4">Расчёт контура</h1>
+        <h1 class="mb-4">Стеклянный навес</h1>
         <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -245,26 +245,26 @@
                         <h5 class="card-title">Основные параметры</h5>
                         <div class="row g-2">
                             <div class="col-md-4">
-                                <label for="n1" class="form-label">n1</label>
+                                <label for="n1" class="form-label">Вертикальное расстояние</label>
                                 <input type="number" step="any" class="form-control" id="n1" name="n1" placeholder="Введите n1" value="{{ calculator.n1 | float | round(2) if calculator.n1 is not none else '' }}">
                             </div>
                             <div class="col-md-4">
-                                <label for="n2" class="form-label">n2</label>
+                                <label for="n2" class="form-label">Между отверстиями в стекле</label>
                                 <input type="number" step="any" class="form-control" id="n2" name="n2" placeholder="Введите n2" value="{{ calculator.n2 | float | round(2) if calculator.n2 is not none else '' }}">
                             </div>
                             <div class="col-md-4">
-                                <label for="n3" class="form-label">n3</label>
+                                <label for="n3" class="form-label">Вант</label>
                                 <input type="number" step="any" class="form-control" id="n3" name="n3" placeholder="Введите n3" value="{{ calculator.get_n3() | float | round(2) if calculator.get_n3() is not none else '' }}">
                             </div>
                         </div>
                         <div class="row g-2 mt-2">
                             <div class="col-md-6">
-                                <label for="angle_EF" class="form-label">Угол (0°–10°)</label>
+                                <label for="angle_EF" class="form-label">Угол наклона стекла</label>
                                 <input type="number" step="any" min="0" max="10" class="form-control" id="angle_EF" name="angle_EF" placeholder="0–10" value="{{ (calculator.angle_D - 180) | float | round(2) if calculator.angle_D is not none else '' }}">
                             </div>
                             <div class="col-md-6 d-flex align-items-end">
                                 <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="rev" name="rev" {{ 'checked' if calculator.REV else '' }}>
+                                    <input class="form-check-input" type="checkbox" id="rev" name="rev" {% if calculator.REV %}checked{% endif %}>
                                     <label class="form-check-label" for="rev">REV</label>
                                 </div>
                             </div>
@@ -312,13 +312,13 @@
                         <div class="card-body">
                             <h6 class="card-title">Эскиз контура</h6>
                             <img src="{{ plot_url }}" alt="Эскиз контура" class="img-fluid">
-                            <a href="{{ plot_url }}" download="contour_plot.png" class="btn btn-outline-secondary btn-sm mt-2"><i class="bi bi-download me-1"></i>Скачать график</a>
+                            <a href="{{ plot_url }}" download="contour_plot.png" class="btn btn-outline-secondary btn-sm mt-2"><i class="bi bi-download me-1"></i>Скачать</a>
                         </div>
                     </div>
                 {% endif %}
                 <div class="card shadow-sm mb-3">
                     <div class="card-body">
-                        <h6 class="card-title">Координаты точек</h6>
+                        <h6 class="card-title">Координаты</h6>
                         <table class="table table-bordered">
                             <thead>
                                 <tr>
@@ -362,13 +362,11 @@
                     </div>
                     <div class="modal-body">
                         <ul>
-                            <li>Выберите конфигурацию из списка или используйте "Пользовательская конфигурация" для ручного ввода.</li>
-                            <li>Введите три из четырёх параметров: n1, n2, n3, угол (0°–10°). Например, n1=100, n2=100, n3=100.</li>
-                            <li>Включите REV с помощью ползунка, чтобы изменить направления линий CD и DE.</li>
-                            <li>Для точной настройки нажмите "Свои настройки" и введите H1–H8, Hcor.</li>
-                            <li>Hcor корректирует n3: прибавляется при вводе, вычитается при выводе.</li>
-                            <li>Нажмите "Рассчитать" для получения результатов, графика и координат точек.</li>
-                            <li>Используйте "Сброс" для возврата к умолчанию.</li>
+                             <li>Выберите конфигурацию фурнитуры из списка или используйте «Пользовательская конфигурация». Для изменения параметров конфигурации нажмите «Свои настройки».</li>
+                             <li>Откройте «Свои настройки», чтобы вручную задать размеры либо изменить существующие.</li>
+                             <li>Включите REV, если нижний фитинг должен быть под стеклом.</li>
+                             <li>Введите три из четырёх параметров в «Основных параметрах»: n1 (вертикальное расстояние между креплениями к стене), n2 (расстояние между отверстиями в стекле), n3 (длина ванта), угол (0°–10°).</li>
+                             <li>Нажмите «Рассчитать» для получения искомого параметра.</li>
                         </ul>
                     </div>
                     <div class="modal-footer">

@@ -1,0 +1,22 @@
+{
+    "_comment": {
+        "c_x": "H2",
+        "cd_len": "H3",
+        "de_len": "H4",
+        "fg_len": "H5",
+        "gh_len": "H6",
+        "hi_len": "H7",
+        "j_x": "H1",
+        "jk_len": "H8"
+    },
+    "c_x": -160,
+    "cd_len": 65,
+    "de_len": 20,
+    "fg_len": 20,
+    "gh_len": 70,
+    "hi_len": 43.5,
+    "j_x": -48,
+    "jk_len": 8.5,
+    "hcor": 80,
+    "image": null
+}
