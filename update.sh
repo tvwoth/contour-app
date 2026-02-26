@@ -24,12 +24,21 @@ cd "${APP_DIR}" || fail "Каталог ${APP_DIR} не найден"
 log "Получение последних изменений из Git..."
 git pull --ff-only
 
+COMPOSE_CMD=""
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE_CMD="docker-compose"
+else
+  fail "Не найден ни 'docker compose', ни 'docker-compose'. Установите docker-compose и повторите попытку."
+fi
+
 log "Пересборка образов..."
-docker compose build
+${COMPOSE_CMD} build
 
 log "Применение обновлённых контейнеров..."
-docker compose up -d
+${COMPOSE_CMD} up -d
 
 log "Текущий статус сервисов:"
-docker compose ps
+${COMPOSE_CMD} ps
 
