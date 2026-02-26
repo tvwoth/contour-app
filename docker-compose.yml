@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: contour-app
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - APP_PORT=${APP_PORT}
+    expose:
+      - "${APP_PORT}"
+    networks:
+      - contour-net
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: contour-nginx
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - contour-net
+
+networks:
+  contour-net:
+    driver: bridge
+

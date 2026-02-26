@@ -1,0 +1,14 @@
+[Unit]
+Description=Contour App Flask Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/contour-app
+ExecStart=/opt/contour-app/run.sh
+Restart=always
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+

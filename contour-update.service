@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily auto-update for contour-app (Docker)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/contour-app
+ExecStart=/opt/contour-app/update.sh
+

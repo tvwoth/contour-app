@@ -1,0 +1,10 @@
+[Unit]
+Description=Run contour-app auto-update daily
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
