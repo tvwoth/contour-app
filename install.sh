@@ -84,10 +84,13 @@ cat > .env <<EOF
 APP_PORT=${APP_PORT}
 EOF
 
-if grep -q "APP_PORT_PLACEHOLDER" nginx/default.conf; then
+if grep -q "APP_PORT_PLACEHOLDER" nginx/default.conf 2>/dev/null; then
   log "Подстановка порта в nginx/default.conf..."
   sed -i "s/APP_PORT_PLACEHOLDER/${APP_PORT}/g" nginx/default.conf
 fi
+
+log "Остановка и удаление старых контейнеров (если есть)..."
+${COMPOSE_CMD} down -v || true
 
 log "Сборка и запуск контейнеров (${COMPOSE_CMD} up -d --build)..."
 ${COMPOSE_CMD} up -d --build
