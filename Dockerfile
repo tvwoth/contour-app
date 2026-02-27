@@ -15,6 +15,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY . /app
 
+RUN chown -R appuser:appgroup /app
+
 USER appuser
 
 EXPOSE ${APP_PORT}

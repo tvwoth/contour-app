@@ -13,8 +13,9 @@ app.jinja_env.globals.update(zip=zip_longest)
 
 # Dictionary with paths to configuration help images
 config_images = {
-    'default': 'default_config.png',
-    'test': 'test_config.png',
+    'Премьер комплект YP01YP02YP03G01': 'default_config.png',
+    'Синдикат КЗ471КЗ472КЗ473': 'test_config.png',
+    'задайте значения': '',
     'Пользовательская конфигурация': ''
 }
 
@@ -24,13 +25,16 @@ def get_config_options():
     config_dir = os.path.join(os.path.dirname(__file__), 'configs')
     configs = [f for f in os.listdir(config_dir) if f.endswith('.json')]
     configs = [os.path.splitext(f)[0] for f in configs]
+    # Сортируем конфигурации, выводя "задайте значения" первой
+    configs = sorted(configs, key=lambda name: (name != 'задайте значения', name))
     configs.append('Пользовательская конфигурация')
     return configs
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     config_options = get_config_options()
-    selected_config = 'default'  # Инициализация для GET-запросов
+    # По умолчанию показываем конфигурацию "задайте значения"
+    selected_config = 'задайте значения'
     results = None
     plot_url = None
     abs_j_x = None
@@ -43,7 +47,7 @@ def index():
         form_config = request.form.get('config', selected_config)
 
         if action == 'load_config':
-            selected_config = form_config if form_config in config_options else 'default'
+            selected_config = form_config if form_config in config_options else 'задайте значения'
             if selected_config != 'Пользовательская конфигурация':
                 config_path = os.path.join(os.path.dirname(__file__), 'configs', f'{selected_config}.json')
                 try:
@@ -58,7 +62,7 @@ def index():
             calculator.__init__()
             abs_j_x = abs(calculator.J_X) if calculator.J_X is not None else None
             abs_c_x = abs(calculator.C_X) if calculator.C_X is not None else None
-            selected_config = 'default'  # Сбрасываем на default
+            selected_config = 'задайте значения'  # Сбрасываем на "задайте значения"
             flash('Параметры сброшены.', 'success')
 
         elif action == 'calculate':

@@ -29,7 +29,10 @@ class ContourCalculator:
         self.angle_D = None
         self.alpha = None
         self.angle_EF = None
-        self.load_config(os.path.join(os.path.dirname(__file__), "configs", "default.json"))
+        # Загружаем конфигурацию "задайте значения" (все нули) по умолчанию
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        default_config_path = os.path.join(base_dir, "configs", "задайте значения.json")
+        self.load_config(default_config_path)
 
     def load_config(self, config_file=None):
         if config_file and os.path.exists(config_file):
