@@ -3,6 +3,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/tvwoth/contour-app.git"
+REPO_BRANCH="updates"
 APP_DIR="/opt/contour-app"
 
 log() {
@@ -66,13 +67,15 @@ systemctl enable docker
 systemctl start docker
 
 if [[ -d "${APP_DIR}/.git" ]]; then
-  log "Репозиторий уже существует в ${APP_DIR}, обновляю через git pull..."
+  log "Репозиторий уже существует в ${APP_DIR}, переключаюсь на ветку ${REPO_BRANCH} и обновляю..."
   cd "${APP_DIR}"
-  git pull --ff-only || fail "Не удалось выполнить git pull в ${APP_DIR}"
+  git fetch origin || fail "Не удалось выполнить git fetch в ${APP_DIR}"
+  git checkout "${REPO_BRANCH}" || fail "Не удалось переключиться на ветку ${REPO_BRANCH}"
+  git pull --ff-only origin "${REPO_BRANCH}" || fail "Не удалось выполнить git pull в ${APP_DIR}"
 else
-  log "Клонирование репозитория в ${APP_DIR}..."
+  log "Клонирование репозитория (ветка ${REPO_BRANCH}) в ${APP_DIR}..."
   rm -rf "${APP_DIR}"
-  git clone "${REPO_URL}" "${APP_DIR}" || fail "Не удалось клонировать репозиторий"
+  git clone --branch "${REPO_BRANCH}" --single-branch "${REPO_URL}" "${APP_DIR}" || fail "Не удалось клонировать репозиторий"
   cd "${APP_DIR}"
 fi
 
