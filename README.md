@@ -128,3 +128,34 @@ sudo systemctl enable --now contour-update.timer
 
 Снаружи URL останется `http://SERVER_IP`, так как Nginx слушает 80‑й порт и проксирует запросы на внутренний порт приложения.
 
+Как удалить приложение с сервера
+--------------------------------
+
+1. Остановите и удалите контейнеры и тома (из `/opt/contour-app`):
+
+   ```bash
+   docker compose down -v
+   ```
+
+2. (Опционально) Отключите автообновление, если включали его ранее:
+
+   ```bash
+   sudo systemctl disable --now contour-update.timer || true
+   sudo systemctl disable contour-update.service || true
+   sudo rm -f /etc/systemd/system/contour-update.service /etc/systemd/system/contour-update.timer
+   sudo systemctl daemon-reload
+   ```
+
+3. Удалите директорию приложения:
+
+   ```bash
+   sudo rm -rf /opt/contour-app
+   ```
+
+4. (Опционально) Если Docker больше не нужен на этом сервере, вы можете удалить его и связанные данные:
+
+   ```bash
+   sudo apt remove -y docker.io docker-compose docker-compose-plugin || true
+   sudo docker system prune -a -f || true
+   ```
+
