@@ -65,9 +65,17 @@ ensure_docker_repo() {
 install_packages() {
     log "Обновляем список пакетов..."
     apt-get update -y
-    log "Устанавливаем необходимые пакеты..."
+
+    log "Устанавливаем утилиты для Docker..."
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        apt-transport-https ca-certificates curl gnupg lsb-release \
+        ca-certificates curl gnupg lsb-release || true
+
+    # (репозиторий уже добавлен в ensure_docker_repo)
+    log "Обновляем индекс пакетов с репозитория Docker..."
+    apt-get update -y
+
+    log "Устанавливаем Docker и остальные пакеты..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
         docker-ce docker-ce-cli containerd.io \
         docker-buildx-plugin docker-compose-plugin \
         git nginx || true
@@ -103,10 +111,30 @@ confirm() {
     [[ "$resp" == "yes" ]]
 }
 
+start_docker() {
+    log "Запуск Docker daemon..."
+    # попытаться через systemctl, игнорируем ошибки в контейнерах/LXC
+    systemctl enable docker --now 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
+
+    if ! pgrep -x dockerd >/dev/null 2>&1; then
+        log_warn "Docker не запущен системой, стартуем вручную..."
+        dockerd > /var/log/dockerd.log 2>&1 &
+        sleep 8
+    fi
+
+    if ! docker version >/dev/null 2>&1; then
+        log_error "Docker не запустился после установки. Смотрите /var/log/dockerd.log"
+        exit 1
+    fi
+    log_success "Docker успешно установлен и работает"
+}
+
 main() {
     require_root
     ensure_docker_repo
     install_packages
+    start_docker
     check_versions
 
     APP_DIR="/opt/contour-app"

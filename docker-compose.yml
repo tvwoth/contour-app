@@ -2,7 +2,7 @@ services:
   app:
     build: .
     container_name: contour-app
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -15,7 +15,7 @@ services:
   nginx:
     image: nginx:stable-alpine
     container_name: contour-nginx
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
