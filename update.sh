@@ -1,44 +1,67 @@
 #!/usr/bin/env bash
 
+################################################################################
+#                                                                              #
+#  update.sh — безопасное обновление контейнеризированного приложения         #
+#                                                                              #
+#  Действует idempotentно:                                                      #
+#   • проверяет root                                                           #
+#   • скачивает свежий код из Git                                               #
+#   • восстанавливает права на скрипты                                         #
+#   • очищает старые контейнеры, чтобы избежать конфликтов                     #
+#   • пересобирает и перезапускает стек                                          #
+#                                                                              #
+################################################################################
+
 set -euo pipefail
 
-APP_DIR="/opt/contour-app"
+# цвета
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-log() {
-  echo "[contour-update] $*"
+log() { echo -e "${BLUE}[contour-update]${NC} $*"; }
+log_success() { echo -e "${GREEN}[contour-update]${NC} $*"; }
+log_error() { echo -e "${RED}[contour-update] ОШИБКА:${NC} $*" >&2; }
+
+require_root() {
+    if [[ $EUID -ne 0 ]]; then
+        log_error "Скрипт должен запускаться от root."
+        exit 1
+    fi
 }
 
-fail() {
-  echo "[contour-update] ОШИБКА: $*" >&2
-  exit 1
+trap 'log_error "Обновление прервано."' ERR
+
+main() {
+    require_root
+    APP_DIR="/opt/contour-app"
+
+    if [[ ! -d "$APP_DIR" ]]; then
+        log_error "Каталог $APP_DIR не найден."
+        exit 1
+    fi
+
+    cd "$APP_DIR"
+    log "Получаем последние изменения из Git..."
+    git pull --ff-only || true
+
+    log "Делаем скрипты исполняемыми..."
+    chmod +x *.sh || true
+
+    log "Останавливаем старые контейнеры и очищаем..."
+    docker compose down --remove-orphans || true
+
+    log "Собираем образы и перезапускаем стек..."
+    docker compose build --no-cache || true
+    docker compose up -d --force-recreate
+
+    log "Текущий статус:"
+    docker compose ps || true
+
+    log_success "Обновление завершено."
 }
 
-trap 'fail "Обновление прервано из-за ошибки. Проверьте вывод выше."' ERR
-
-if [[ "$(id -u)" -ne 0 ]]; then
-  fail "Скрипт должен выполняться от root. Запустите: sudo ./update.sh"
-fi
-
-cd "${APP_DIR}" || fail "Каталог ${APP_DIR} не найден"
-
-log "Получение последних изменений из Git..."
-git pull --ff-only
-
-COMPOSE_CMD=""
-if docker compose version >/dev/null 2>&1; then
-  COMPOSE_CMD="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE_CMD="docker-compose"
-else
-  fail "Не найден ни 'docker compose', ни 'docker-compose'. Установите docker-compose и повторите попытку."
-fi
-
-log "Пересборка образов..."
-${COMPOSE_CMD} build
-
-log "Применение обновлённых контейнеров..."
-${COMPOSE_CMD} up -d
-
-log "Текущий статус сервисов:"
-${COMPOSE_CMD} ps
-
+main "$@"

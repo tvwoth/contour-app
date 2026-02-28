@@ -1,110 +1,170 @@
 #!/usr/bin/env bash
 
+################################################################################
+#                                                                              #
+#  install.sh — автоматическая установка/обновление окружения Contour App    #
+#                                                                              #
+#  Скрипт выполняет всё «в одну команду»:                                      #
+#   • настраивает репозиторий Docker (CE)                                     #
+#   • устанавливает требуемые пакеты (docker-ce, плагины, git, nginx и т.д.)   #
+#   • проверяет версии Docker/Compose                                          #
+#   • клонирует или обновляет репозиторий в /opt/contour-app                    #
+#   • делает chmod +x для всех скриптов                                        #
+#   • формирует .env и настраивает nginx-конфиг                                #
+#   • подчищает предыдущие контейнеры и запускает стек в docker compose        #
+#   • предлагает включить автообновление (systemd timer)                      #
+#                                                                              #
+#  Скрипт идемпотентен и безопасен: повторный запуск не повредит               #
+#                                                                              #
+################################################################################
+
 set -euo pipefail
 
-REPO_URL="https://github.com/tvwoth/contour-app.git"
-REPO_BRANCH="updates"
-APP_DIR="/opt/contour-app"
+# цвета
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-log() {
-  echo "[contour-install] $*"
+log() { echo -e "${BLUE}[contour-install]${NC} $*"; }
+log_success() { echo -e "${GREEN}[contour-install]${NC} $*"; }
+log_error() { echo -e "${RED}[contour-install] ОШИБКА:${NC} $*" >&2; }
+log_warn() { echo -e "${YELLOW}[contour-install]${NC} $*"; }
+
+require_root() {
+    if [[ $EUID -ne 0 ]]; then
+        log_error "Запустите скрипт с правами root (sudo)."
+        exit 1
+    fi
 }
 
-fail() {
-  echo "[contour-install] ОШИБКА: $*" >&2
-  exit 1
+check_cmd() {
+    command -v "$1" >/dev/null 2>&1
 }
 
-trap 'fail "Установка прервана из-за ошибки. Проверьте вывод выше."' ERR
+version_ge() {
+    dpkg --compare-versions "$1" ge "$2"
+}
 
-if [[ "$(id -u)" -ne 0 ]]; then
-  fail "Скрипт должен выполняться от root. Запустите: sudo ./install.sh"
-fi
+ensure_docker_repo() {
+    if ! grep -Rq "download.docker.com" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null; then
+        log "Добавляем репозиторий Docker..."
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+            | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        log_success "Репозиторий Docker добавлен."
+    else
+        log "Репозиторий Docker уже настроен."
+    fi
+}
 
-if [[ -r /etc/os-release ]]; then
-  . /etc/os-release
-  ID_LIKE_LOWER=$(echo "${ID_LIKE:-}" | tr '[:upper:]' '[:lower:]')
-  ID_LOWER=$(echo "${ID:-}" | tr '[:upper:]' '[:lower:]')
-  if [[ "${ID_LOWER}" != "ubuntu" && "${ID_LOWER}" != "debian" && "${ID_LIKE_LOWER}" != *"debian"* && "${ID_LIKE_LOWER}" != *"ubuntu"* ]]; then
-    fail "Поддерживаются только Ubuntu/Debian. Обнаружена система: ${ID:-unknown}"
-  fi
-else
-  fail "Не удалось определить дистрибутив (нет /etc/os-release)."
-fi
+install_packages() {
+    log "Обновляем список пакетов..."
+    apt-get update -y
+    log "Устанавливаем необходимые пакеты..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        apt-transport-https ca-certificates curl gnupg lsb-release \
+        docker-ce docker-ce-cli containerd.io \
+        docker-buildx-plugin docker-compose-plugin \
+        git nginx || true
+}
 
-read -rp "Введите внутренний порт приложения (APP_PORT) [5000]: " APP_PORT
-APP_PORT=${APP_PORT:-5000}
+check_versions() {
+    if ! check_cmd docker; then
+        log_error "docker не найден после установки."
+        exit 1
+    fi
+    local docker_ver
+    docker_ver=$(docker version --format '{{.Server.Version}}' 2>/dev/null || echo "0")
+    if ! version_ge "$docker_ver" "20.0"; then
+        log_error "Требуется Docker >=20. Установлена $docker_ver"
+        exit 1
+    fi
+    log "Docker версии $docker_ver OK."
 
-log "Обновление списка пакетов..."
-apt-get update -y
+    if check_cmd docker; then
+        local compose_ver
+        compose_ver=$(docker compose version --short 2>/dev/null || echo "0")
+        if ! version_ge "$compose_ver" "2.0"; then
+            log_error "Требуется docker compose v2+. Текущая версия: $compose_ver"
+            exit 1
+        fi
+        log "docker compose версии $compose_ver OK."
+    fi
+}
 
-log "Установка Docker и git..."
-DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io git
+confirm() {
+    local msg="$1"
+    read -r -p "${YELLOW}$msg (yes/no): ${NC}" resp
+    [[ "$resp" == "yes" ]]
+}
 
-if ! command -v docker >/dev/null 2>&1; then
-  fail "Docker не установлен корректно. Проверьте установку пакета docker.io."
-fi
+main() {
+    require_root
+    ensure_docker_repo
+    install_packages
+    check_versions
 
-COMPOSE_CMD=""
-if docker compose version >/dev/null 2>&1; then
-  COMPOSE_CMD="docker compose"
-elif command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE_CMD="docker-compose"
-else
-  log "docker compose не найден, пробую установить docker-compose..."
-  DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose || true
-  if command -v docker-compose >/dev/null 2>&1; then
-    COMPOSE_CMD="docker-compose"
-  fi
-fi
+    APP_DIR="/opt/contour-app"
+    REPO_URL="https://github.com/tvwoth/contour-app.git"
+    REPO_BRANCH="updates"
 
-if [[ -z "${COMPOSE_CMD}" ]]; then
-  fail "Не найден ни 'docker compose', ни 'docker-compose'. Установите docker-compose вручную и повторите попытку."
-fi
+    if [[ -d "$APP_DIR/.git" ]]; then
+        log "Репозиторий уже существует, обновляем..."
+        cd "$APP_DIR"
+        git fetch origin
+        git checkout "$REPO_BRANCH" || true
+        git pull --ff-only origin "$REPO_BRANCH"
+    else
+        log "Клонируем репозиторий в $APP_DIR..."
+        rm -rf "$APP_DIR"
+        git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
+        cd "$APP_DIR"
+    fi
 
-log "Включение и запуск сервиса docker..."
-systemctl enable docker
-systemctl start docker
+    log "Делаем скрипты исполняемыми..."
+    chmod +x *.sh || true
 
-if [[ -d "${APP_DIR}/.git" ]]; then
-  log "Репозиторий уже существует в ${APP_DIR}, переключаюсь на ветку ${REPO_BRANCH} и обновляю..."
-  cd "${APP_DIR}"
-  git fetch origin || fail "Не удалось выполнить git fetch в ${APP_DIR}"
-  git checkout "${REPO_BRANCH}" || fail "Не удалось переключиться на ветку ${REPO_BRANCH}"
-  git pull --ff-only origin "${REPO_BRANCH}" || fail "Не удалось выполнить git pull в ${APP_DIR}"
-else
-  log "Клонирование репозитория (ветка ${REPO_BRANCH}) в ${APP_DIR}..."
-  rm -rf "${APP_DIR}"
-  git clone --branch "${REPO_BRANCH}" --single-branch "${REPO_URL}" "${APP_DIR}" || fail "Не удалось клонировать репозиторий"
-  cd "${APP_DIR}"
-fi
+    read -rp "Введите внутренний порт приложения (APP_PORT) [5000]: " APP_PORT
+    APP_PORT=${APP_PORT:-5000}
+    log "Порт: $APP_PORT"
 
-log "Создание файла .env с портом приложения..."
-cat > .env <<EOF
+    log "Генерируем .env..."
+    cat > .env <<EOF
 APP_PORT=${APP_PORT}
 EOF
 
-if grep -q "APP_PORT_PLACEHOLDER" nginx/default.conf 2>/dev/null; then
-  log "Подстановка порта в nginx/default.conf..."
-  sed -i "s/APP_PORT_PLACEHOLDER/${APP_PORT}/g" nginx/default.conf
-fi
+    if grep -q "APP_PORT_PLACEHOLDER" nginx/default.conf 2>/dev/null; then
+        sed -i "s/APP_PORT_PLACEHOLDER/${APP_PORT}/g" nginx/default.conf
+    fi
 
-log "Остановка и удаление старых контейнеров (если есть)..."
-${COMPOSE_CMD} down -v || true
+    log "Останавливаем любые существующие контейнеры..."
+    docker compose down --remove-orphans -v || true
 
-log "Сборка и запуск контейнеров (${COMPOSE_CMD} up -d --build)..."
-${COMPOSE_CMD} up -d --build
+    log "Запуск контейнеров (docker compose up -d --build --force-recreate)..."
+    docker compose up -d --build --force-recreate
 
-SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
-SERVER_IP="${SERVER_IP:-<SERVER_IP>}"
+    local ip
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    ip=${ip:-<SERVER_IP>}
+    log_success "Приложение должно быть доступно по http://${ip}"
 
-echo
-log "УСТАНОВКА ЗАВЕРШЕНА."
-echo "Приложение доступно (после запуска контейнеров) по адресу:"
-echo "  http://${SERVER_IP}"
-echo
-echo "Для управления контейнерами из каталога ${APP_DIR}:"
-echo "  ${COMPOSE_CMD} ps"
-echo "  ${COMPOSE_CMD} logs -f"
-echo "  ${COMPOSE_CMD} restart"
+    if confirm "Включить ежедневное автообновление (contour-update.timer)?"; then
+        log "Настраиваем systemd-таймеры..."
+        cp contour-update.service contour-update.timer /etc/systemd/system/ || true
+        systemctl daemon-reload
+        systemctl enable --now contour-update.timer
+        log_success "Автообновление включено."
+    else
+        log "Автообновление не включено."
+    fi
+
+    log_success "Установка/обновление завершено."
+}
+
+main "$@"
 

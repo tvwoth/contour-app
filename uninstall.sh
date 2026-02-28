@@ -138,6 +138,12 @@ main() {
         log_warning "docker-compose.yml не найден, пропускаем остановку контейнеров"
     fi
     
+    # Шаг 2.1: Удаление Nginx-конфигов
+    log_info "Удаляем конфиги Nginx (если существуют)..."
+    rm -f /etc/nginx/sites-enabled/contour* /etc/nginx/sites-available/contour* 2>/dev/null || true
+    systemctl reload nginx 2>/dev/null || true
+    log_success "Конфиги Nginx удалены и nginx перезагружен (если установлен)"
+    
     echo ""
     
     # Шаг 3: Отключить и удалить systemd-юниты
@@ -185,6 +191,13 @@ main() {
         log_warning "Директория /opt/contour-app уже не существует"
     fi
     
+    # по желанию очистим Docker
+    if confirm_action "Очистить неиспользуемые объекты Docker (prune)?" "$force_mode"; then
+        log_info "Выполняем docker system prune --volumes..."
+        docker system prune -f --volumes 2>/dev/null || true
+        log_success "Docker очищен"
+    fi
+    
     echo ""
     
     # Шаг 5: Информация о ручной очистке
@@ -193,7 +206,7 @@ main() {
     log_warning "=========================================="
     echo ""
     log_info "Nginx:"
-    log_info "  1. Если был создан отдельный конфиг для Contour App, удалите:"
+    log_info "  1. Конфиги Nginx уже удалены автоматически, но проверьте их наличие и удалите вручную, если остались:"
     log_info "     sudo rm -f /etc/nginx/sites-enabled/contour*"
     log_info "     sudo rm -f /etc/nginx/sites-available/contour*"
     log_info ""
