@@ -36,6 +36,7 @@ contour-app/
 ├── docker-compose.yml         # Сервисы: app + nginx, restart: always
 ├── install.sh                 # One-click установка Docker-версии
 ├── update.sh                  # Обновление из Git + пересборка контейнеров
+├── uninstall.sh               # One-click удаление приложения и следов
 ├── nginx/default.conf         # Reverse proxy: 80 → app:APP_PORT
 ├── requirements.txt           # Python-зависимости
 ├── .env.example               # Шаблон для .env (APP_PORT)
@@ -136,29 +137,33 @@ docker compose logs -f nginx
 
 ## 🗑 Полное удаление приложения
 
-1. Удалите контейнеры и тома:
-   ```bash
-   docker compose down -v
-   ```
+Для полного удаления приложения со всеми следами установки:
 
-2. (Опционально) Отключите автообновление, если оно было настроено:
-   ```bash
-   sudo systemctl disable --now contour-update.timer || true
-   sudo systemctl disable contour-update.service || true
-   sudo rm -f /etc/systemd/system/contour-update.service /etc/systemd/system/contour-update.timer
-   sudo systemctl daemon-reload
-   ```
+```bash
+sudo ./uninstall.sh
+```
 
-3. Удалите файлы приложения:
-   ```bash
-   sudo rm -rf /opt/contour-app
-   ```
+Скрипт автоматически:
+- ✓ Останавливает Docker-контейнеры и удаляет volumes
+- ✓ Отключает и удаляет systemd-юниты для автообновления
+- ✓ Удаляет директорию `/opt/contour-app`
+- ✓ Требует подтверждения перед удалением
 
-4. (Опционально) Если Docker больше не нужен — удалите его:
-   ```bash
-   sudo apt remove -y docker.io docker-compose docker-compose-plugin || true
-   sudo docker system prune -a -f || true
-   ```
+**Запустить без подтверждения:**
+```bash
+sudo ./uninstall.sh --force
+```
+
+**Ручная очистка** (если нужна):
+```bash
+# Удалить конфиг Nginx (если был создан)
+sudo rm -f /etc/nginx/sites-enabled/contour*
+sudo nginx -t && sudo systemctl reload nginx
+
+# Удалить Docker (если больше не нужен)
+sudo apt remove -y docker.io docker-compose docker-compose-plugin
+sudo docker system prune -a -f
+```
 
 ---
 
