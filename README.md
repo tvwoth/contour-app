@@ -40,11 +40,14 @@ contour-app/
 ├── nginx/default.conf         # Reverse proxy: 80 → app:APP_PORT
 ├── requirements.txt           # Python-зависимости
 ├── .env.example               # Шаблон для .env (APP_PORT)
-├── app.py                     # Точка входа Flask (dev-порт 5000)
-├── calculator/                # Логика расчётов
-├── templates/                 # HTML-шаблоны
-├── static/                    # CSS, JS, изображения
-└── configs/                   # Дополнительные конфиги
+├── app/                       # Python-пакет с приложением
+│   ├── __init__.py            # Flask‑приложение
+│   ├── calculator/            # Логика расчётов
+│   ├── templates/             # HTML-шаблоны
+│   ├── static/                # CSS, JS, изображения
+│   └── configs/               # Дополнительные конфиги
+└── (прочие скрипты и файлы)
+
 ```
 
 ---
@@ -59,15 +62,16 @@ contour-app/
 2. На лету добавляет официальный репозиторий Docker (CE) и ключ.
 3. Устанавливает или обновляет пакеты:
    `docker-ce`, `docker-ce-cli`, `containerd.io`,
-   `docker-buildx-plugin`, `docker-compose-plugin`, `git`, `nginx` и
-   утилиты (`curl`, `lsb-release` и др.).
+   `docker-buildx-plugin`, `docker-compose-plugin`, `git` и утилиты
+   (`curl`, `lsb-release` и др.).
+   **Nginx не устанавливается на хосте — он запускается в контейнере.**
 4. Проверяет версии Docker (>= 20) и docker compose (v2+);
    если не удовлетворяют — прекращает выполнение.
 5. Клонирует/обновляет репозиторий в `/opt/contour-app` (ветка `updates`),
    делает `chmod +x` для всех скриптов.
-6. Запрашивает порт (по умолчанию 5000) и формирует `.env`,
-   автоматически заменяет `APP_PORT_PLACEHOLDER` в
-   `nginx/default.conf`.
+5. Запрашивает порт (по умолчанию 5000) и, если `.env` ещё не создан,
+   копирует шаблон `.env.example` и подставляет значение. Существующий
+   `.env` не перезаписывается.
 7. Перед поднятием стека очищает любые орфанные контейнеры
    (`docker compose down --remove-orphans -v`).
 8. Собирает и запускает контейнеры:

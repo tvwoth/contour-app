@@ -6,11 +6,11 @@
 #                                                                              #
 #  Скрипт выполняет всё «в одну команду»:                                      #
 #   • настраивает репозиторий Docker (CE)                                     #
-#   • устанавливает требуемые пакеты (docker-ce, плагины, git, nginx и т.д.)   #
+#   • устанавливает требуемые пакеты (docker-ce, плагины, git и утилиты)     #
 #   • проверяет версии Docker/Compose                                          #
 #   • клонирует или обновляет репозиторий в /opt/contour-app                    #
 #   • делает chmod +x для всех скриптов                                        #
-#   • формирует .env и настраивает nginx-конфиг                                #
+#   • формирует .env (не перезаписывает существующий)                         #
 #   • подчищает предыдущие контейнеры и запускает стек в docker compose        #
 #   • предлагает включить автообновление (systemd timer)                      #
 #                                                                              #
@@ -74,11 +74,18 @@ install_packages() {
     log "Обновляем индекс пакетов с репозитория Docker..."
     apt-get update -y
 
-    log "Устанавливаем Docker и остальные пакеты..."
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        docker-ce docker-ce-cli containerd.io \
-        docker-buildx-plugin docker-compose-plugin \
-        git nginx || true
+    if check_cmd docker; then
+        log "Docker уже установлен, пропускаем установку пакетов Docker."
+    else
+        log "Устанавливаем Docker и плагины..."
+        DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            docker-ce docker-ce-cli containerd.io \
+            docker-buildx-plugin docker-compose-plugin || true
+    fi
+
+    # git должен быть установлен независимо
+    DEBIAN_FRONTEND=noninteractive apt-get install -y git || true
+    # nginx на хосте нам не нужен – всё работает внутри контейнера
 }
 
 check_versions() {
@@ -161,13 +168,19 @@ main() {
     APP_PORT=${APP_PORT:-5000}
     log "Порт: $APP_PORT"
 
-    log "Генерируем .env..."
-    cat > .env <<EOF
-APP_PORT=${APP_PORT}
-EOF
-
-    if grep -q "APP_PORT_PLACEHOLDER" nginx/default.conf 2>/dev/null; then
-        sed -i "s/APP_PORT_PLACEHOLDER/${APP_PORT}/g" nginx/default.conf
+    # формируем файл окружения только при первом запуске
+    if [ ! -f .env ]; then
+        log ".env не найден, создаём из примера"
+        if [ -f .env.example ]; then
+            cp .env.example .env
+            # подставляем порт по-умолчанию
+            sed -i "s/^APP_PORT=.*$/APP_PORT=${APP_PORT}/" .env
+        else
+            echo "APP_PORT=${APP_PORT}" > .env
+        fi
+        log_success ".env создан"
+    else
+        log ".env уже существует, пропускаем создание"
     fi
 
     log "Останавливаем любые существующие контейнеры..."

@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
-WORKDIR /app
+WORKDIR /app  # repository root; Python path will include this directory
+# application code lives inside the `app/` Python package
 
 COPY requirements.txt /app/
 

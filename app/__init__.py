@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, flash, url_for
-from calculator.contour_calculator import ContourCalculator, generate_plot
+# when the application lives inside the `app` package, use a relative import
+from .calculator.contour_calculator import ContourCalculator, generate_plot
 import os
 import json
 import secrets
@@ -119,7 +120,7 @@ def index():
                 # Сохраняем текущую конфигурацию или переключаем на Пользовательскую
                 selected_config = form_config if form_config in config_options else 'Пользовательская конфигурация'
                 # Проверяем, изменены ли параметры H
-                config_path = os.path.join('configs', f'{form_config}.json')
+                config_path = os.path.join(os.path.dirname(__file__), 'configs', f'{form_config}.json')
                 if os.path.exists(config_path) and form_config != 'Пользовательская конфигурация':
                     with open(config_path, 'r', encoding='utf-8') as f:
                         config_data = json.load(f)

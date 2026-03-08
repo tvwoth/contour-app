@@ -11,6 +11,11 @@ services:
       - "${APP_PORT}"
     networks:
       - contour-net
+    healthcheck:
+      test: ["CMD","curl","-f","http://localhost:${APP_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   nginx:
     image: nginx:stable-alpine
