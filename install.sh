@@ -34,6 +34,10 @@ log_warn() { echo -e "${YELLOW}[contour-install]${NC} $*"; }
 
 require_root() {
     if [[ $EUID -ne 0 ]]; then
+        if command -v sudo >/dev/null 2>&1; then
+            log "Перезапускаем скрипт через sudo..."
+            exec sudo bash "$0" "$@"
+        fi
         log_error "Запустите скрипт с правами root (sudo)."
         exit 1
     fi
@@ -138,7 +142,7 @@ start_docker() {
 }
 
 main() {
-    require_root
+    require_root "$@"
     ensure_docker_repo
     install_packages
     start_docker
@@ -146,7 +150,7 @@ main() {
 
     APP_DIR="/opt/contour-app"
     REPO_URL="https://github.com/tvwoth/contour-app.git"
-    REPO_BRANCH="updates"
+    REPO_BRANCH="main"
 
     if [[ -d "$APP_DIR/.git" ]]; then
         log "Репозиторий уже существует, обновляем..."

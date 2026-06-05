@@ -55,8 +55,7 @@ main() {
     docker compose down --remove-orphans || true
 
     log "Собираем образы и перезапускаем стек..."
-    docker compose build --no-cache || true
-    docker compose up -d --force-recreate
+    docker compose up -d --build --force-recreate
 
     log "Текущий статус:"
     docker compose ps || true
