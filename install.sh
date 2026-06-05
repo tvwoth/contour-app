@@ -150,7 +150,7 @@ main() {
 
     APP_DIR="/opt/contour-app"
     REPO_URL="https://github.com/tvwoth/contour-app.git"
-    REPO_BRANCH="main"
+    REPO_BRANCH="${CONTOUR_BRANCH:-main}"
 
     if [[ -d "$APP_DIR/.git" ]]; then
         log "Репозиторий уже существует, обновляем..."
