@@ -116,6 +116,11 @@ check_versions() {
     fi
 }
 
+is_port_busy() {
+    local port="$1"
+    ss -ltn 2>/dev/null | awk '{print $4}' | awk -F: '{print $NF}' | grep -qE "^${port}$"
+}
+
 confirm() {
     local msg="$1"
     read -r -p "${YELLOW}$msg (yes/no): ${NC}" resp
@@ -193,6 +198,30 @@ main() {
     else
         log ".env уже существует, пропускаем создание"
     fi
+
+    if grep -q '^HOST_HTTP_PORT=' .env 2>/dev/null; then
+        HOST_HTTP_PORT=$(grep '^HOST_HTTP_PORT=' .env | cut -d'=' -f2-)
+    else
+        HOST_HTTP_PORT=80
+    fi
+
+    if is_port_busy "$HOST_HTTP_PORT"; then
+        log_warn "Порт $HOST_HTTP_PORT уже занят на хосте."
+        read -rp "Введите порт хоста для nginx [8080]: " HOST_HTTP_PORT
+        HOST_HTTP_PORT=${HOST_HTTP_PORT:-8080}
+        while is_port_busy "$HOST_HTTP_PORT"; do
+            log_warn "Порт $HOST_HTTP_PORT тоже занят. Выберите другой порт."
+            read -rp "Введите порт хоста для nginx [8080]: " HOST_HTTP_PORT
+            HOST_HTTP_PORT=${HOST_HTTP_PORT:-8080}
+        done
+    fi
+
+    if grep -q '^HOST_HTTP_PORT=' .env 2>/dev/null; then
+        sed -i "s/^HOST_HTTP_PORT=.*$/HOST_HTTP_PORT=${HOST_HTTP_PORT}/" .env
+    else
+        echo "HOST_HTTP_PORT=${HOST_HTTP_PORT}" >> .env
+    fi
+    log "HTTP-порт nginx на хосте: ${HOST_HTTP_PORT}"
 
     log "Останавливаем любые существующие контейнеры..."
     docker compose down --remove-orphans -v || true
