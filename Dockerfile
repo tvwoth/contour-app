@@ -20,7 +20,9 @@ RUN chown -R appuser:appgroup /app
 
 USER appuser
 
+ENV PYTHONPATH=/app
+
 EXPOSE ${APP_PORT}
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${APP_PORT:-5000} --workers 3 app:app"]
+CMD ["gunicorn", "--chdir", "/app", "--bind", "0.0.0.0:${APP_PORT:-5000}", "--workers", "3", "app:app"]
 
