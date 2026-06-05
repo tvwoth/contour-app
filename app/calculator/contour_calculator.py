@@ -324,7 +324,16 @@ class ContourCalculator:
     def get_angle_EF(self):
         return self.angle_D - 180
 
-def generate_plot(points, output_path="static/plot.png"):
+def generate_plot(points, output_path=None):
+    if output_path is None:
+        # Fallback to current directory if no path provided
+        output_path = "plot.png"
+    
+    # Ensure the directory exists
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    
     fig, ax = plt.subplots(figsize=(6, 4))
     x = [p[0] for p in points] + [points[0][0]]
     y = [p[1] for p in points] + [points[0][1]]

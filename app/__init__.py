@@ -97,7 +97,9 @@ def index():
                 calculator.set_directions(REV=rev)
 
                 points = calculator.calculate(n1, n2, n3, angle_EF)
-                generate_plot(points)
+                # Сохраняем график в папку static приложения
+                plot_path = os.path.join(os.path.dirname(__file__), 'static', 'plot.png')
+                generate_plot(points, output_path=plot_path)
                 plot_url = url_for('static', filename='plot.png')
 
                 results = {
