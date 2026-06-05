@@ -24,5 +24,5 @@ ENV PYTHONPATH=/app
 
 EXPOSE ${APP_PORT}
 
-CMD ["gunicorn", "--chdir", "/app", "--bind", "0.0.0.0:${APP_PORT:-5000}", "--workers", "3", "app:app"]
+CMD ["sh", "-c", "gunicorn --chdir /app --bind 0.0.0.0:${APP_PORT:-5000} --workers 3 app:app"]
 
