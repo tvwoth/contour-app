@@ -168,6 +168,13 @@ main() {
     log "Делаем скрипты исполняемыми..."
     chmod +x *.sh || true
 
+    log "Устанавливаем команды в /usr/local/bin..."
+    mkdir -p /usr/local/bin
+    ln -sf "$APP_DIR/install.sh" /usr/local/bin/contour-install
+    ln -sf "$APP_DIR/update.sh" /usr/local/bin/contour-update
+    ln -sf "$APP_DIR/uninstall.sh" /usr/local/bin/contour-uninstall
+    log_success "Команды contour-install, contour-update и contour-uninstall доступны глобально."
+
     read -rp "Введите внутренний порт приложения (APP_PORT) [5000]: " APP_PORT
     APP_PORT=${APP_PORT:-5000}
     log "Порт: $APP_PORT"

@@ -12,23 +12,24 @@
 ```bash
 sudo apt update
 sudo apt install curl -y
-curl -O https://raw.githubusercontent.com/tvwoth/contour-app/main/install.sh  
+curl -O https://raw.githubusercontent.com/tvwoth/contour-app/main/install.sh
 chmod +x install.sh
 sudo ./install.sh
 ```
 
-🔹 В процессе установки вас попросят указать **внутренний порт приложения (`APP_PORT`)** — по умолчанию `5000`.  
+🔹 В процессе установки вас попросят указать **внутренний порт приложения (`APP_PORT`)** — по умолчанию `5000`.
 🔹 После завершения приложение будет доступно в браузере по адресу:
 
 ```text
 http://SERVER_IP
 ```
 
-> 💡 `SERVER_IP` — внешний IP-адрес вашего сервера. Узнать его можно командой `hostname -I`.
+После первого запуска доступны глобальные команды:
 
----
-
-## 🗂 Структура проекта
+```bash
+sudo contour-install
+sudo contour-update
+sudo contour-uninstall
 
 ```
 contour-app/
@@ -94,10 +95,16 @@ contour-app/
 
 ## 🔄 Обновление приложения
 
-Самый простой способ обновиться — снова запустить тот же
-`install.sh` или отдельный `update.sh`:
+Самый простой способ обновиться — использовать глобальную команду:
 
 ```bash
+sudo contour-update
+```
+
+Альтернативно можно запустить локальный скрипт из каталога установки:
+
+```bash
+cd /opt/contour-app
 sudo ./update.sh
 ```
 
@@ -173,9 +180,16 @@ docker compose logs -f nginx
 
 ## 🗑 Полное удаление приложения
 
-Для полного удаления приложения со всеми следами установки:
+Для полного удаления приложения со всеми следами установки выполните глобальную команду:
 
 ```bash
+sudo contour-uninstall
+```
+
+Если вы находитесь в каталоге `/opt/contour-app`, можно использовать локальный скрипт:
+
+```bash
+cd /opt/contour-app
 sudo ./uninstall.sh
 ```
 

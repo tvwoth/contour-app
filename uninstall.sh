@@ -190,7 +190,11 @@ main() {
     else
         log_warning "Директория /opt/contour-app уже не существует"
     fi
-    
+
+    log_info "Удаляем команды из /usr/local/bin..."
+    rm -f /usr/local/bin/contour-install /usr/local/bin/contour-update /usr/local/bin/contour-uninstall 2>/dev/null || true
+    log_success "Глобальные команды удалены"
+
     # по желанию очистим Docker
     if confirm_action "Очистить неиспользуемые объекты Docker (prune)?" "$force_mode"; then
         log_info "Выполняем docker system prune --volumes..."
