@@ -21,6 +21,7 @@ RUN chown -R appuser:appgroup /app
 USER appuser
 
 ENV PYTHONPATH=/app
+ENV MPLCONFIGDIR=/tmp/.config/matplotlib
 
 EXPOSE ${APP_PORT}
 
