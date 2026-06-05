@@ -11,8 +11,8 @@ WORKDIR /app  # repository root; Python path will include this directory
 
 COPY requirements.txt /app/
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade pip
+RUN python -m pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
 
