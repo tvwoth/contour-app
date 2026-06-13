@@ -25,22 +25,13 @@ class ConfigRepository:
     def ensure_user_dir(self) -> None:
         try:
             os.makedirs(self.user_dir, exist_ok=True)
-        except OSError as e:
-            raise ValueError(f'Не удалось создать директорию конфигураций {self.user_dir}: {str(e)}')
+        except OSError:
+            self.user_dir = None
+            return
 
         if not os.path.isdir(self.user_dir):
-            raise ValueError(f'Путь для пользовательских конфигураций не является директорией: {self.user_dir}')
-
-        test_file = os.path.join(self.user_dir, '.write_test')
-        try:
-            with open(test_file, 'w', encoding='utf-8') as f:
-                f.write('ok')
-            os.remove(test_file)
-        except OSError as e:
-            raise ValueError(
-                f'Каталог {self.user_dir} недоступен для записи. ' 
-                f'Проверьте права доступа и монтирование volume в Docker: {str(e)}'
-            )
+            self.user_dir = None
+            return
 
     def list_system_configs(self) -> list[str]:
         if not os.path.isdir(self.system_dir):
@@ -53,7 +44,7 @@ class ConfigRepository:
         return sorted(names, key=lambda name: (name != 'задайте значения', name))
 
     def list_user_configs(self) -> list[str]:
-        if not os.path.isdir(self.user_dir):
+        if not self.user_dir or not os.path.isdir(self.user_dir):
             return []
         names = [
             os.path.splitext(f)[0]
@@ -85,6 +76,8 @@ class ConfigRepository:
         return os.path.isfile(os.path.join(self.system_dir, f'{name}.json'))
 
     def is_user_config(self, name: str) -> bool:
+        if not self.user_dir:
+            return False
         return os.path.isfile(os.path.join(self.user_dir, f'{name}.json'))
 
     def resolve_config_path(self, name: str) -> Optional[str]:
@@ -93,6 +86,8 @@ class ConfigRepository:
         system_path = os.path.join(self.system_dir, f'{name}.json')
         if os.path.isfile(system_path):
             return system_path
+        if not self.user_dir:
+            return None
         user_path = os.path.join(self.user_dir, f'{name}.json')
         if os.path.isfile(user_path):
             return user_path
@@ -125,16 +120,18 @@ class ConfigRepository:
         return result
 
     def save_user_config(self, name: str, data: dict[str, Any]) -> str:
+        if not self.user_dir:
+            raise ValueError('Каталог пользовательских конфигураций недоступен для записи')
+
         safe_name = self.sanitize_config_name(name)
         validated = self.validate_h_params(data)
         payload = {**validated, 'image': None}
-        
-        # Убедимся, что директория существует
+
         try:
             os.makedirs(self.user_dir, exist_ok=True)
         except OSError as e:
             raise ValueError(f'Не удалось создать директорию конфигураций: {str(e)}')
-        
+
         path = os.path.join(self.user_dir, f'{safe_name}.json')
         try:
             with open(path, 'w', encoding='utf-8') as f:
@@ -143,18 +140,17 @@ class ConfigRepository:
             raise ValueError(f'Не удалось сохранить файл конфигурации: {str(e)}')
         except json.JSONDecodeError as e:
             raise ValueError(f'Ошибка кодирования JSON: {str(e)}')
-        
+
         return safe_name
 
     def load_user_config(self, name: str) -> dict[str, Any]:
-        if not self.is_user_config(name):
+        if not self.user_dir or not self.is_user_config(name):
             raise ValueError('Пользовательская конфигурация не найдена')
         path = os.path.join(self.user_dir, f'{name}.json')
-        
-        # Проверка размера файла перед чтением
+
         if os.path.getsize(path) > MAX_CONFIG_FILE_SIZE:
             raise ValueError('Файл конфигурации слишком большой')
-        
+
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -162,7 +158,7 @@ class ConfigRepository:
             raise ValueError(f'Не удалось прочитать файл конфигурации: {str(e)}')
         except json.JSONDecodeError as e:
             raise ValueError(f'Ошибка формата JSON в файле конфигурации: {str(e)}')
-        
+
         return data
 
     def delete_user_config(self, name: str) -> None:
