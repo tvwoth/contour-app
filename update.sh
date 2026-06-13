@@ -65,7 +65,13 @@ main() {
         log "SECRET_KEY сгенерирован для сессий Flask"
     fi
 
+    # Убедимся, что каталог для пользовательских конфигураций существует
     mkdir -p data/user_configs
+
+    # Приведём права и владельца на каталог внутри $APP_DIR
+    mkdir -p "$APP_DIR/app/user_configs"
+    chown -R 1000:1000 "$APP_DIR/app/user_configs" 2>/dev/null || true
+    chmod 755 "$APP_DIR/app/user_configs" 2>/dev/null || true
 
     ln -sf "$APP_DIR/change-password.sh" /usr/local/bin/contour-change-password 2>/dev/null || true
 
@@ -74,6 +80,23 @@ main() {
 
     log "Собираем образы и перезапускаем стек..."
     docker compose up -d --build --force-recreate
+
+    echo "Waiting for container startup..."
+    sleep 10
+
+    STATUS=$(docker inspect --format='{{.State.Status}}' contour-app 2>/dev/null || echo "")
+    if [ "$STATUS" != "running" ]; then
+        echo "Container failed to start. Logs:"
+        docker logs --tail 50 contour-app || true
+        exit 1
+    fi
+
+    HEALTH=$(docker inspect --format='{{.State.Health.Status}}' contour-app 2>/dev/null || echo "")
+    if [ -n "$HEALTH" ] && [ "$HEALTH" != "healthy" ]; then
+        echo "Container is not healthy. Logs:"
+        docker logs --tail 50 contour-app || true
+        exit 1
+    fi
 
     log "Текущий статус:"
     docker compose ps || true
