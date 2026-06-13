@@ -178,7 +178,8 @@ main() {
     ln -sf "$APP_DIR/install.sh" /usr/local/bin/contour-install
     ln -sf "$APP_DIR/update.sh" /usr/local/bin/contour-update
     ln -sf "$APP_DIR/uninstall.sh" /usr/local/bin/contour-uninstall
-    log_success "Команды contour-install, contour-update и contour-uninstall доступны глобально."
+    ln -sf "$APP_DIR/change-password.sh" /usr/local/bin/contour-change-password
+    log_success "Команды contour-install, contour-update, contour-uninstall и contour-change-password доступны глобально."
 
     read -rp "Введите внутренний порт приложения (APP_PORT) [5000]: " APP_PORT
     APP_PORT=${APP_PORT:-5000}
@@ -189,15 +190,38 @@ main() {
         log ".env не найден, создаём из примера"
         if [ -f .env.example ]; then
             cp .env.example .env
-            # подставляем порт по-умолчанию
             sed -i "s/^APP_PORT=.*$/APP_PORT=${APP_PORT}/" .env
         else
             echo "APP_PORT=${APP_PORT}" > .env
         fi
+        read -rsp "Введите пароль администратора (Enter = admin): " ADMIN_PW
+        echo
+        ADMIN_PW=${ADMIN_PW:-admin}
+        if grep -q '^CONFIG_ADMIN_PASSWORD=' .env 2>/dev/null; then
+            sed -i "s|^CONFIG_ADMIN_PASSWORD=.*$|CONFIG_ADMIN_PASSWORD=${ADMIN_PW}|" .env
+        else
+            echo "CONFIG_ADMIN_PASSWORD=${ADMIN_PW}" >> .env
+        fi
         log_success ".env создан"
     else
         log ".env уже существует, пропускаем создание"
+        if ! grep -q '^CONFIG_ADMIN_PASSWORD=' .env 2>/dev/null; then
+            read -rsp "Введите пароль администратора (Enter = admin): " ADMIN_PW
+            echo
+            ADMIN_PW=${ADMIN_PW:-admin}
+            echo "CONFIG_ADMIN_PASSWORD=${ADMIN_PW}" >> .env
+            log_success "Пароль администратора добавлен в .env"
+        fi
     fi
+
+    if ! grep -q '^SECRET_KEY=' .env 2>/dev/null; then
+        SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))")
+        echo "SECRET_KEY=${SECRET_KEY}" >> .env
+        log "SECRET_KEY сгенерирован для сессий Flask"
+    fi
+
+    log "Создаём каталог для пользовательских конфигураций..."
+    mkdir -p data/user_configs
 
     if grep -q '^HOST_HTTP_PORT=' .env 2>/dev/null; then
         HOST_HTTP_PORT=$(grep '^HOST_HTTP_PORT=' .env | cut -d'=' -f2-)

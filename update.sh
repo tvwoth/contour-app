@@ -51,6 +51,24 @@ main() {
     log "Делаем скрипты исполняемыми..."
     chmod +x *.sh || true
 
+    if [[ -f .env ]] && ! grep -q '^CONFIG_ADMIN_PASSWORD=' .env 2>/dev/null; then
+        read -rsp "Пароль администратора отсутствует. Введите пароль (Enter = admin): " ADMIN_PW
+        echo
+        ADMIN_PW=${ADMIN_PW:-admin}
+        echo "CONFIG_ADMIN_PASSWORD=${ADMIN_PW}" >> .env
+        log_success "Пароль администратора добавлен в .env"
+    fi
+
+    if [[ -f .env ]] && ! grep -q '^SECRET_KEY=' .env 2>/dev/null; then
+        SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || python3 -c "import secrets; print(secrets.token_hex(32))")
+        echo "SECRET_KEY=${SECRET_KEY}" >> .env
+        log "SECRET_KEY сгенерирован для сессий Flask"
+    fi
+
+    mkdir -p data/user_configs
+
+    ln -sf "$APP_DIR/change-password.sh" /usr/local/bin/contour-change-password 2>/dev/null || true
+
     log "Останавливаем старые контейнеры и очищаем..."
     docker compose down --remove-orphans || true
 

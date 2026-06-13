@@ -80,8 +80,14 @@
         .settings-header {
             display: flex;
             align-items: center;
+            flex-wrap: wrap;
             gap: 0.5rem;
             margin-bottom: 1rem;
+        }
+        .config-admin-panel {
+            border-top: 1px solid #dee2e6;
+            padding-top: 1rem;
+            margin-top: 0.5rem;
         }
         @media (max-width: 576px) {
             .h-params-container {
@@ -172,9 +178,19 @@
                     <div class="d-flex align-items-center mb-3">
                         <form method="POST" id="configForm" class="flex-grow-1">
                             <select class="form-select" id="config" name="config" onchange="this.form.action.value='load_config'; this.form.submit();">
-                                {% for option in config_options %}
-                                    <option value="{{ option }}" {{ 'selected' if option == selected_config else '' }} data-image="{{ config_images[option] if config_images and option in config_images else '' }}">{{ option }}</option>
-                                {% endfor %}
+                                <optgroup label="Пресеты">
+                                    {% for option in preset_configs %}
+                                        <option value="{{ option }}" {{ 'selected' if option == selected_config else '' }} data-image="{{ config_images[option] if config_images and option in config_images else '' }}" data-user="0">{{ option }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% if user_configs %}
+                                <optgroup label="Мои конфигурации">
+                                    {% for option in user_configs %}
+                                        <option value="{{ option }}" {{ 'selected' if option == selected_config else '' }} data-image="" data-user="1">{{ option }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endif %}
+                                <option value="Пользовательская конфигурация" {{ 'selected' if selected_config == 'Пользовательская конфигурация' else '' }} data-image="" data-user="0">Пользовательская конфигурация</option>
                             </select>
                             <input type="hidden" name="action" value="load_config">
                         </form>
@@ -183,6 +199,13 @@
                     <div class="settings-header">
                         <button type="button" class="btn btn-outline-secondary mb-3" data-bs-toggle="collapse" data-bs-target="#hParams">Свои настройки</button>
                         <button type="button" class="btn btn-outline-info mb-3 ms-2" data-bs-toggle="modal" data-bs-target="#helpModal"><i class="bi bi-question-circle me-1"></i>Инструкция</button>
+                        {% if config_admin %}
+                            <form method="POST" action="{{ url_for('config_admin_logout') }}" class="mb-3 ms-2">
+                                <button type="submit" class="btn btn-outline-success"><i class="bi bi-unlock me-1"></i>Режим редактирования активен</button>
+                            </form>
+                        {% else %}
+                            <button type="button" class="btn btn-outline-warning mb-3 ms-2" data-bs-toggle="modal" data-bs-target="#adminLoginModal"><i class="bi bi-lock me-1"></i>Режим редактирования конфигураций</button>
+                        {% endif %}
                     </div>
                     <div class="collapse h-params-container" id="hParams">
                         <div class="h-params-img-container">
@@ -191,6 +214,7 @@
                         <div class="h-params-fields">
                             <form method="POST" id="hParamsForm">
                                 <input type="hidden" name="action" value="calculate">
+                                <input type="hidden" name="config" id="hParamsConfigHidden" value="{{ selected_config }}">
                                 <div class="row g-2">
                                     <div class="col-md-6">
                                         <div class="mb-2">
@@ -233,6 +257,19 @@
                                     <label for="hcor" class="form-label">Hcor (мм)</label>
                                     <input type="number" step="any" class="form-control" id="hcor" name="hcor" placeholder="Введите Hcor" value="{{ calculator.HCOR | float | round(2) if calculator.HCOR is not none else '' }}">
                                 </div>
+                                {% if config_admin %}
+                                <div class="config-admin-panel">
+                                    <div class="mb-2">
+                                        <label for="config_name" class="form-label">Имя конфигурации</label>
+                                        <input type="text" class="form-control" id="config_name" name="config_name" placeholder="my_profile" value="{{ config_name_field }}" maxlength="100">
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button type="submit" class="btn btn-success" formaction="{{ url_for('save_config') }}" formmethod="POST" id="saveConfigBtn"><i class="bi bi-save me-1"></i>Сохранить конфигурацию</button>
+                                        <button type="submit" class="btn btn-outline-danger" formaction="{{ url_for('delete_config') }}" formmethod="POST" id="deleteConfigBtn"><i class="bi bi-trash me-1"></i>Удалить конфигурацию</button>
+                                        <button type="submit" class="btn btn-outline-primary" formaction="{{ url_for('rename_config') }}" formmethod="POST" id="renameConfigBtn"><i class="bi bi-pencil me-1"></i>Переименовать конфигурацию</button>
+                                    </div>
+                                </div>
+                                {% endif %}
                             </form>
                         </div>
                     </div>
@@ -366,8 +403,9 @@
                     </div>
                     <div class="modal-body">
                         <ul>
-                             <li>Выберите конфигурацию фурнитуры из списка или используйте «Пользовательская конфигурация». Для изменения параметров конфигурации нажмите «Свои настройки».</li>
+                             <li>Выберите конфигурацию фурнитуры из списка «Пресеты» или «Мои конфигурации», либо используйте «Пользовательская конфигурация» для несохранённых изменений.</li>
                              <li>Откройте «Свои настройки», чтобы вручную задать размеры либо изменить существующие.</li>
+                             <li>Для сохранения, удаления и переименования конфигураций войдите в режим редактирования (требуется пароль администратора).</li>
                              <li>Включите REV, если нижний фитинг должен быть под стеклом.</li>
                              <li>Введите три из четырёх параметров в «Основных параметрах»: n1 (вертикальное расстояние между креплениями к стене), n2 (расстояние между отверстиями в стекле), n3 (длина ванта), угол (0°–10°).</li>
                              <li>Нажмите «Рассчитать» для получения искомого параметра.</li>
@@ -376,6 +414,28 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x me-1"></i>Закрыть</button>
                     </div>
+                </div>
+            </div>
+        </div>
+        <!-- Admin Login Modal -->
+        <div class="modal fade" id="adminLoginModal" tabindex="-1" aria-labelledby="adminLoginModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="{{ url_for('config_admin_login') }}">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="adminLoginModalLabel">Режим редактирования конфигураций</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted">Только администратор может сохранять, удалять и переименовывать конфигурации.</p>
+                            <label for="admin_password" class="form-label">Пароль администратора</label>
+                            <input type="password" class="form-control" id="admin_password" name="admin_password" required autocomplete="current-password">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                            <button type="submit" class="btn btn-warning"><i class="bi bi-lock-open me-1"></i>Войти</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -410,45 +470,84 @@
             document.querySelector('.spinner-overlay').style.display = 'flex';
         }
 
+        function syncConfigFields(selectedValue, selectedText, selectedImage, isUserConfig) {
+            const configHidden = document.getElementById('configHidden');
+            const hParamsConfigHidden = document.getElementById('hParamsConfigHidden');
+            const configNameInput = document.getElementById('config_name');
+            if (configHidden) {
+                configHidden.value = selectedValue;
+            }
+            if (hParamsConfigHidden) {
+                hParamsConfigHidden.value = selectedValue;
+            }
+            if (configNameInput && isUserConfig === '1') {
+                configNameInput.value = selectedValue;
+            }
+            const modalTitle = document.getElementById('configHelpModalLabel');
+            const modalImage = document.getElementById('configImage');
+            const configName = document.getElementById('configName');
+            if (modalTitle) {
+                modalTitle.textContent = `Справка по конфигурации: ${selectedText}`;
+            }
+            if (modalImage) {
+                modalImage.src = selectedImage || '';
+            }
+            if (configName) {
+                configName.textContent = selectedText;
+            }
+        }
+
         // Обработчик для изменения конфигурации
         const configSelect = document.getElementById('config');
         configSelect.addEventListener('change', function() {
             showSpinner();
-            const modalTitle = document.getElementById('configHelpModalLabel');
-            const modalImage = document.getElementById('configImage');
-            const configName = document.getElementById('configName');
             const selectedOption = this.options[this.selectedIndex];
-            modalTitle.textContent = `Справка по конфигурации: ${selectedOption.text}`;
-            modalImage.src = selectedOption.dataset.image || '';
-            configName.textContent = selectedOption.text;
-            // Обновляем скрытое поле config в calcForm
-            const configHidden = document.getElementById('configHidden');
-            if (configHidden) {
-                configHidden.value = this.value;
-            }
+            syncConfigFields(
+                this.value,
+                selectedOption.text,
+                selectedOption.dataset.image || '',
+                selectedOption.dataset.user || '0'
+            );
         });
 
         // Обработчик для изменения полей H в hParamsForm
         const hParamsForm = document.getElementById('hParamsForm');
+        const hParamFieldNames = ['j_x', 'c_x', 'cd_len', 'de_len', 'fg_len', 'gh_len', 'hi_len', 'jk_len', 'hcor'];
         Array.from(hParamsForm.elements).forEach(element => {
-            if (element.name && element.type !== 'submit' && element.type !== 'hidden') {
+            if (element.name && hParamFieldNames.includes(element.name)) {
                 element.addEventListener('input', function() {
-                    // Переключаем select на Пользовательская конфигурация
                     configSelect.value = 'Пользовательская конфигурация';
-                    // Обновляем скрытое поле config в calcForm
-                    const configHidden = document.getElementById('configHidden');
-                    if (configHidden) {
-                        configHidden.value = 'Пользовательская конфигурация';
-                    }
-                    // Обновляем модальное окно и configName
-                    const modalTitle = document.getElementById('configHelpModalLabel');
-                    const modalImage = document.getElementById('configImage');
-                    const configName = document.getElementById('configName');
-                    modalTitle.textContent = 'Справка по конфигурации: Пользовательская конфигурация';
-                    modalImage.src = '';
-                    configName.textContent = 'Пользовательская конфигурация';
+                    syncConfigFields('Пользовательская конфигурация', 'Пользовательская конфигурация', '', '0');
                 });
             }
+        });
+
+        ['saveConfigBtn', 'deleteConfigBtn', 'renameConfigBtn'].forEach(function(btnId) {
+            const btn = document.getElementById(btnId);
+            if (!btn) {
+                return;
+            }
+            btn.addEventListener('click', function(event) {
+                showSpinner();
+                const hParamsConfigHidden = document.getElementById('hParamsConfigHidden');
+                if (hParamsConfigHidden) {
+                    hParamsConfigHidden.value = configSelect.value;
+                }
+                if (btnId === 'deleteConfigBtn') {
+                    const selectedOption = configSelect.options[configSelect.selectedIndex];
+                    if (selectedOption.dataset.user !== '1') {
+                        alert('Удалить можно только пользовательскую конфигурацию из списка «Мои конфигурации».');
+                        event.preventDefault();
+                    }
+                }
+                if (btnId === 'renameConfigBtn') {
+                    const selectedOption = configSelect.options[configSelect.selectedIndex];
+                    if (selectedOption.dataset.user !== '1') {
+                        alert('Переименовать можно только пользовательскую конфигурацию из списка «Мои конфигурации».');
+                        event.preventDefault();
+                    }
+                }
+            });
         });
 
         // Обработчик отправки calcForm
@@ -468,10 +567,13 @@
 
         // Инициализация configHidden при загрузке страницы
         document.addEventListener('DOMContentLoaded', function() {
-            const configHidden = document.getElementById('configHidden');
-            if (configHidden) {
-                configHidden.value = configSelect.value;
-            }
+            const selectedOption = configSelect.options[configSelect.selectedIndex];
+            syncConfigFields(
+                configSelect.value,
+                selectedOption.text,
+                selectedOption.dataset.image || '',
+                selectedOption.dataset.user || '0'
+            );
         });
     </script>
     <footer class="text-center mt-5 mb-3 text-muted">
