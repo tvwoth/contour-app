@@ -108,19 +108,41 @@ class ConfigRepository:
         safe_name = self.sanitize_config_name(name)
         validated = self.validate_h_params(data)
         payload = {**validated, 'image': None}
+        
+        # Убедимся, что директория существует
+        try:
+            os.makedirs(self.user_dir, exist_ok=True)
+        except OSError as e:
+            raise ValueError(f'Не удалось создать директорию конфигураций: {str(e)}')
+        
         path = os.path.join(self.user_dir, f'{safe_name}.json')
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, ensure_ascii=False, indent=4)
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, ensure_ascii=False, indent=4)
+        except IOError as e:
+            raise ValueError(f'Не удалось сохранить файл конфигурации: {str(e)}')
+        except json.JSONDecodeError as e:
+            raise ValueError(f'Ошибка кодирования JSON: {str(e)}')
+        
         return safe_name
 
     def load_user_config(self, name: str) -> dict[str, Any]:
         if not self.is_user_config(name):
             raise ValueError('Пользовательская конфигурация не найдена')
         path = os.path.join(self.user_dir, f'{name}.json')
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        
+        # Проверка размера файла перед чтением
         if os.path.getsize(path) > MAX_CONFIG_FILE_SIZE:
             raise ValueError('Файл конфигурации слишком большой')
+        
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except IOError as e:
+            raise ValueError(f'Не удалось прочитать файл конфигурации: {str(e)}')
+        except json.JSONDecodeError as e:
+            raise ValueError(f'Ошибка формата JSON в файле конфигурации: {str(e)}')
+        
         return data
 
     def delete_user_config(self, name: str) -> None:

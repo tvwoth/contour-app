@@ -246,6 +246,8 @@ def save_config():
     require_config_admin()
     config_name = request.form.get('config_name', '').strip()
     try:
+        if not config_name:
+            raise ValueError('Пожалуйста, введите имя конфигурации')
         params = parse_h_params(request.form)
         apply_h_params(calculator, params)
         saved_name = config_repo.save_user_config(config_name, params)
