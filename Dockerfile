@@ -21,13 +21,17 @@ RUN chown -R appuser:appgroup /app
 # Ensure user_configs directory exists inside image and owned by appuser
 RUN mkdir -p /app/app/user_configs && chown -R appuser:appgroup /app/app/user_configs
 
+# Install gosu for dropping privileges at container start
+RUN apt-get update && apt-get install -y gosu && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONPATH=/app
 ENV MPLCONFIGDIR=/tmp/.config/matplotlib
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-USER appuser
+# Run entrypoint as root; entrypoint will drop privileges to UID 1000 using gosu
+ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE ${APP_PORT}
 
