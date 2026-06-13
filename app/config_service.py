@@ -20,7 +20,27 @@ class ConfigRepository:
             'USER_CONFIGS_DIR',
             os.path.join(app_dir, 'user_configs'),
         )
-        os.makedirs(self.user_dir, exist_ok=True)
+        self.ensure_user_dir()
+
+    def ensure_user_dir(self) -> None:
+        try:
+            os.makedirs(self.user_dir, exist_ok=True)
+        except OSError as e:
+            raise ValueError(f'Не удалось создать директорию конфигураций {self.user_dir}: {str(e)}')
+
+        if not os.path.isdir(self.user_dir):
+            raise ValueError(f'Путь для пользовательских конфигураций не является директорией: {self.user_dir}')
+
+        test_file = os.path.join(self.user_dir, '.write_test')
+        try:
+            with open(test_file, 'w', encoding='utf-8') as f:
+                f.write('ok')
+            os.remove(test_file)
+        except OSError as e:
+            raise ValueError(
+                f'Каталог {self.user_dir} недоступен для записи. ' 
+                f'Проверьте права доступа и монтирование volume в Docker: {str(e)}'
+            )
 
     def list_system_configs(self) -> list[str]:
         if not os.path.isdir(self.system_dir):
