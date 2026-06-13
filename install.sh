@@ -223,6 +223,11 @@ main() {
     log "Создаём каталог для пользовательских конфигураций..."
     mkdir -p data/user_configs
 
+    # Назначение владельца UID 1000 (appuser внутри контейнера)
+    chown -R 1000:1000 data/user_configs || true
+    # Установка прав доступа (только владелец пишет)
+    chmod 755 data/user_configs || true
+
     if grep -q '^HOST_HTTP_PORT=' .env 2>/dev/null; then
         HOST_HTTP_PORT=$(grep '^HOST_HTTP_PORT=' .env | cut -d'=' -f2-)
     else
@@ -252,6 +257,24 @@ main() {
 
     log "Запуск контейнеров (docker compose up -d --build --force-recreate)..."
     docker compose up -d --build --force-recreate
+
+    echo "Waiting for container startup..."
+    sleep 10
+
+    STATUS=$(docker inspect --format='{{.State.Status}}' contour-app 2>/dev/null || echo "")
+    if [ "$STATUS" != "running" ]; then
+        echo "Container failed to start. Logs:"
+        docker logs --tail 20 contour-app || true
+        exit 1
+    fi
+
+    # Если в контейнере объявлен HEALTHCHECK, убедимся, что он healthy
+    HEALTH=$(docker inspect --format='{{.State.Health.Status}}' contour-app 2>/dev/null || echo "")
+    if [ -n "$HEALTH" ] && [ "$HEALTH" != "healthy" ]; then
+        echo "Container is not healthy. Logs:"
+        docker logs --tail 20 contour-app || true
+        exit 1
+    fi
 
     local ip
     ip=$(hostname -I 2>/dev/null | awk '{print $1}')
